@@ -75,6 +75,27 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline
 .item .l{min-width:0}
 .item .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .empty{color:var(--muted);text-align:center;padding:20px}
+.search{position:relative}
+.search input{padding-left:38px;padding-right:38px}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--muted);pointer-events:none}
+.search button{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);font-size:16px;padding:6px 8px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;font:inherit;font-size:13px;border:1px dashed var(--line);background:transparent;color:var(--fg);border-radius:8px;padding:5px 10px;white-space:nowrap}
+.chips button[aria-pressed="true"]{border-style:solid;border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:500}
+.chips button small{color:var(--muted);margin-left:3px;font-variant-numeric:tabular-nums}
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tools select{font:inherit;font-size:14px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 6px;min-width:0;width:100%}
+.count{font-size:13px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.count button{border:0;background:transparent;color:var(--accent);font:inherit;font-size:13px;padding:0}
+.grp{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0 6px;border-bottom:2px solid var(--line);font-weight:700;cursor:pointer;user-select:none}
+.grp small{font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
+.grp .arr{transition:transform .2s;display:inline-block;margin-right:6px;color:var(--muted)}
+.grp.closed .arr{transform:rotate(-90deg)}
+.tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:4px;background:var(--accent-soft);color:var(--accent);margin-left:6px;vertical-align:1px}
+mark{background:var(--warn-soft);color:inherit;border-radius:2px;padding:0 1px}
+.catquick{display:flex;flex-wrap:wrap;gap:6px}
+.catquick button{font:inherit;font-size:12px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:3px 10px}
 ol{margin:0;padding-left:20px;font-size:14px}
 [hidden]{display:none!important}
 </style>
@@ -90,7 +111,6 @@ ol{margin:0;padding-left:20px;font-size:14px}
   <section class="card" id="setup" hidden>
     <b>第一次使用：連接 Google 試算表</b>
     <label>試算表網頁應用程式網址<input id="sUrl" class="mono" placeholder="https://script.google.com/macros/s/…/exec"></label>
-    <label>密碼（與 Code.gs 裡的 SECRET 相同）<input id="sKey" type="password"></label>
     <button class="btn primary" id="sSave">連線</button>
     <p class="sub" id="sMsg"></p>
   </section>
@@ -112,7 +132,7 @@ ol{margin:0;padding-left:20px;font-size:14px}
       </div>
       <p class="camhint" id="camHint">條碼橫放在框內，距離約 10–15 公分</p>
       <div class="row">
-        <input id="manual" class="mono" inputmode="numeric" placeholder="或手動輸入條碼數字" style="flex:1">
+        <input id="manual" class="mono" placeholder="輸入條碼數字或品名" style="flex:1">
         <button class="btn" id="manualBtn">查詢</button>
       </div>
 
@@ -122,11 +142,13 @@ ol{margin:0;padding-left:20px;font-size:14px}
         <div class="batches" id="batches"></div>
         <form id="form" style="display:flex;flex-direction:column;gap:10px" autocomplete="off">
           <b id="formTitle">新增效期</b>
+          <label>品名<input id="fName" required placeholder="例：鮮奶 936ml"></label>
           <div class="grid2">
-            <label>品名<input id="fName" required placeholder="例：鮮奶 936ml"></label>
+            <label>分類<input id="fCat" list="cats" placeholder="例：乳製品"></label>
             <label>貨架<input id="fShelf" list="shelves" placeholder="例：A3-2"></label>
           </div>
-          <datalist id="shelves"></datalist>
+          <div class="catquick" id="catQuick"></div>
+          <datalist id="shelves"></datalist><datalist id="cats"></datalist>
           <label>有效期限<input id="fExp" type="date" required></label>
           <div class="quick" id="quick"></div>
           <button class="btn primary big" id="saveBtn" type="submit">儲存</button>
@@ -137,7 +159,24 @@ ol{margin:0;padding-left:20px;font-size:14px}
     <!-- 清單 -->
     <section id="pList" hidden style="margin-top:12px">
       <div class="card">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" type="search" enterkeyhint="search" placeholder="搜尋品名、條碼、貨架、分類">
+          <button id="qClear" type="button" aria-label="清除搜尋" hidden>✕</button>
+        </div>
         <div class="filters" id="filters"></div>
+        <div class="chips" id="catChips"></div>
+        <div class="tools">
+          <select id="shelfSel" aria-label="貨架"></select>
+          <select id="sortSel" aria-label="排序">
+            <option value="exp">效期近→遠</option><option value="expd">效期遠→近</option>
+            <option value="shelf">依貨架</option><option value="name">依品名</option>
+          </select>
+          <select id="groupSel" aria-label="分組">
+            <option value="cat">依分類分組</option><option value="shelf">依貨架分組</option><option value="none">不分組</option>
+          </select>
+        </div>
+        <div class="count"><span id="count"></span><button id="resetF" type="button" hidden>清除全部條件</button></div>
         <div id="list"></div>
         <button class="btn" id="reloadBtn">重新整理</button>
       </div>
@@ -156,9 +195,8 @@ ol{margin:0;padding-left:20px;font-size:14px}
 
 <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script>
-/* 可以直接把網址和密碼寫在這裡，同事打開就不用再設定 */
+/* 可以直接把網址寫在這裡，同事打開就不用再設定 */
 const PRESET_URL = '';
-const PRESET_KEY = '';
 
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, '0');
@@ -170,8 +208,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 2500); }
 function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
 
-let API = PRESET_URL || ls('api') || '', KEY = PRESET_KEY || ls('key') || '';
-let items = [], current = null, editingId = null, listFilter = 'stale';
+let API = PRESET_URL || ls('api') || '', KEY = ls('key') || '';
+let items = [], current = null, editingId = null;
 
 /* ---------- 後端 ---------- */
 async function api(action, data = {}) {
@@ -186,16 +224,16 @@ async function api(action, data = {}) {
 
 /* ---------- 啟動 ---------- */
 function boot() {
-  if (!API || !KEY) { $('setup').hidden = false; $('app').hidden = true; return; }
+  if (!API) { $('setup').hidden = false; $('app').hidden = true; return; }
   $('setup').hidden = true; $('app').hidden = false; $('curUrl').textContent = API;
   api('list').catch(e => toast('讀取失敗：' + e.message));
 }
 $('sSave').onclick = async () => {
-  API = $('sUrl').value.trim(); KEY = $('sKey').value;
+  API = $('sUrl').value.trim(); KEY = '';
   if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(API)) { $('sMsg').textContent = '網址應該是 https://script.google.com/macros/s/…/exec'; return; }
   $('sMsg').textContent = '連線中…';
-  try { await api('list'); ls('api', API); ls('key', KEY); $('sMsg').textContent = ''; boot(); toast('連線成功'); }
-  catch (e) { $('sMsg').textContent = '連線失敗：' + e.message + '。請確認網址、密碼，以及部署時存取權選「所有人」。'; }
+  try { await api('list'); ls('api', API); ls('key', null); $('sMsg').textContent = ''; boot(); toast('連線成功'); }
+  catch (e) { $('sMsg').textContent = '連線失敗：' + e.message + '。請確認網址結尾是 /exec，且部署時存取權選「所有人」。'; }
 };
 $('resetBtn').onclick = () => { ls('api', null); ls('key', null); API = ''; KEY = ''; stopCam(); boot(); };
 
@@ -304,7 +342,9 @@ function onScanned(code) {
 }
 function resume() { $('result').hidden = true; if (stream) { $('camOver').hidden = true; $('cam').classList.remove('hit'); lastCode = ''; hits = 0; loopOn = true; scanLoop(); } else startCam(); }
 $('againBtn').onclick = () => { resume(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-$('manualBtn').onclick = () => { const c = cleanCode($('manual').value); if (!c) return; if (!checkEAN(c)) { toast('條碼檢查碼不對，請再確認數字'); return; } loopOn = false; showResult(c); $('manual').value = ''; };
+$('manualBtn').onclick = () => { const raw = $('manual').value.trim(); if (!raw) return;
+  if (!/^\d{6,}$/.test(norm(raw).replace(/\s/g, ''))) { $('q').value = raw; $('manual').value = ''; listFilter = 'all'; tab('list'); renderAll(); return; }
+  const c = cleanCode(norm(raw).replace(/\s/g, '')); if (!checkEAN(c)) { toast('條碼檢查碼不對，請再確認數字'); return; } loopOn = false; showResult(c); $('manual').value = ''; };
 $('manual').addEventListener('keydown', e => { if (e.key === 'Enter') $('manualBtn').click(); });
 
 /* ---------- 結果 / 批次 ---------- */
@@ -319,7 +359,7 @@ function showResult(code) {
   current = code; editingId = null;
   $('result').hidden = false; $('rCode').textContent = code;
   const mine = items.filter(x => x.code === code);
-  $('fName').value = mine[0]?.name || ''; $('fShelf').value = mine[0]?.shelf || ''; $('fExp').value = '';
+  $('fName').value = mine[0]?.name || ''; $('fCat').value = mine[0]?.category || ''; $('fShelf').value = mine[0]?.shelf || ''; $('fExp').value = '';
   $('formTitle').textContent = mine.length ? '新增另一個效期（不同批號）' : '新商品，請填入資料';
   renderBatches();
   setTimeout(() => $('result').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
@@ -338,7 +378,7 @@ function renderBatches() {
       <div class="sub">${esc(it.shelf || '未填貨架')}・${ok ? '本月已確認' : '本月未確認（上次 ' + esc(it.checkedMonth || '—') + '）'}</div><div class="row"></div>`;
     const row = el.querySelector('.row');
     if (!ok) row.append(btn('效期沒變，確認', 'btn sm primary', () => act('confirm', { id: it.id }, '已確認')));
-    row.append(btn('修改', 'btn sm', () => { editingId = it.id; $('fName').value = it.name; $('fShelf').value = it.shelf; $('fExp').value = it.expiry; $('formTitle').textContent = '修改這個效期'; $('fExp').focus(); }));
+    row.append(btn('修改', 'btn sm', () => { editingId = it.id; $('fName').value = it.name; $('fCat').value = it.category || ''; $('fShelf').value = it.shelf; $('fExp').value = it.expiry; $('formTitle').textContent = '修改這個效期'; $('fExp').focus(); }));
     const del = btn('已下架/賣完', 'btn sm', () => {
       row.innerHTML = '<span class="sub">確定刪除這個效期？</span>';
       row.append(btn('刪除', 'btn sm danger', () => act('delete', { id: it.id }, '已刪除')), btn('取消', 'btn sm', renderBatches));
@@ -357,33 +397,149 @@ $('form').onsubmit = async e => {
   e.preventDefault(); if (!current) return;
   $('saveBtn').disabled = true; $('saveBtn').textContent = '儲存中…';
   try {
-    await api('save', { id: editingId, code: current, name: $('fName').value.trim(), shelf: $('fShelf').value.trim(), expiry: $('fExp').value });
+    await api('save', { id: editingId, code: current, name: $('fName').value.trim(), category: $('fCat').value.trim(), shelf: $('fShelf').value.trim(), expiry: $('fExp').value });
     toast('已儲存，可以掃下一個'); editingId = null; $('fExp').value = ''; $('formTitle').textContent = '新增另一個效期（不同批號）';
   } catch (err) { toast('儲存失敗：' + err.message); }
   $('saveBtn').disabled = false; $('saveBtn').textContent = '儲存';
 };
 
-/* ---------- 清單 ---------- */
-const FILTERS = [['stale', '本月未確認'], ['d30', '30天內'], ['expired', '已過期'], ['all', '全部']];
-function matchF(it, f) { const d = daysLeft(it.expiry); if (f === 'stale') return it.checkedMonth !== curMonth(); if (f === 'expired') return d !== null && d < 0; if (f === 'd30') return d !== null && d >= 0 && d <= 30; return true; }
+/* ---------- 清單：搜尋 / 篩選 / 分類 ---------- */
+const FILTERS = [['all', '全部'], ['stale', '本月未確認'], ['d7', '7天內'], ['d30', '30天內'], ['expired', '已過期']];
+const NOCAT = '未分類', NOSHELF = '未填貨架';
+let listFilter = ls('f') || 'stale', catSel = ls('cat') || '', shelfSel = ls('shelf') || '', sortBy = ls('sort') || 'exp', groupBy = ls('group') || 'cat';
+const closed = new Set();
+$('sortSel').value = sortBy; $('groupSel').value = groupBy;
+
+// 全形轉半形、轉小寫、去掉多餘空白，讓「Ａ３」「a3」「A3」都找得到
+const norm = s => String(s ?? '').replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/　/g, ' ').toLowerCase().trim();
+const catOf = it => it.category || NOCAT;
+function matchF(it, f) {
+  const d = daysLeft(it.expiry);
+  if (f === 'stale') return it.checkedMonth !== curMonth();
+  if (f === 'expired') return d !== null && d < 0;
+  if (f === 'd7') return d !== null && d >= 0 && d <= 7;
+  if (f === 'd30') return d !== null && d >= 0 && d <= 30;
+  return true;
+}
+// 多個關鍵字用空格分開，全部都要符合；數字可以只打條碼的末幾碼
+function terms() { return norm($('q').value).split(/\s+/).filter(Boolean); }
+function matchQ(it, ts) {
+  if (!ts.length) return true;
+  const hay = norm([it.name, it.shelf, it.category, it.expiry].join(' '));
+  return ts.every(t => hay.includes(t) || (/^\d+$/.test(t) && it.code.includes(t)));
+}
+function hl(text, ts) {
+  let out = esc(text); if (!ts.length) return out;
+  const src = norm(text);
+  // 以正規化後的位置標記，原字元保留
+  const marks = new Array(text.length).fill(false);
+  ts.forEach(t => { let i = src.indexOf(t); while (t && i > -1) { for (let k = i; k < i + t.length; k++) marks[k] = true; i = src.indexOf(t, i + t.length); } });
+  if (!marks.some(Boolean)) return out;
+  out = ''; let open = false;
+  [...text].forEach((ch, i) => { if (marks[i] && !open) { out += '<mark>'; open = true; } if (!marks[i] && open) { out += '</mark>'; open = false; } out += esc(ch); });
+  return out + (open ? '</mark>' : '');
+}
+function hlCode(code, ts) {
+  const t = ts.find(t => /^\d+$/.test(t) && code.includes(t));
+  if (!t) return esc(code); const i = code.indexOf(t);
+  return esc(code.slice(0, i)) + '<mark>' + esc(t) + '</mark>' + esc(code.slice(i + t.length));
+}
+function save(k, v) { ls(k, v); }
+
 function renderAll() {
   const cm = curMonth(), done = items.filter(x => x.checkedMonth === cm).length;
   $('progTxt').textContent = `本月已確認 ${done} / ${items.length}`; $('progBar').style.width = items.length ? done / items.length * 100 + '%' : '0';
-  $('shelves').innerHTML = [...new Set(items.map(x => x.shelf).filter(Boolean))].sort().map(s => `<option value="${esc(s)}">`).join('');
+  const shelves = [...new Set(items.map(x => x.shelf).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-Hant', { numeric: true }));
+  const cats = [...new Set(items.map(x => x.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  $('shelves').innerHTML = shelves.map(s => `<option value="${esc(s)}">`).join('');
+  $('cats').innerHTML = cats.map(s => `<option value="${esc(s)}">`).join('');
+  renderCatQuick(cats);
+
+  // 貨架下拉
+  if (shelfSel && !shelves.includes(shelfSel) && shelfSel !== NOSHELF) shelfSel = '';
+  $('shelfSel').innerHTML = `<option value="">全部貨架</option>` + shelves.map(s => `<option>${esc(s)}</option>`).join('') + (items.some(x => !x.shelf) ? `<option>${NOSHELF}</option>` : '');
+  $('shelfSel').value = shelfSel;
+
+  const ts = terms();
+  $('qClear').hidden = !ts.length;
+  const byQS = items.filter(it => matchQ(it, ts) && (!shelfSel || (it.shelf || NOSHELF) === shelfSel));
+
+  // 狀態篩選（數字跟著搜尋與分類變動）
+  const byCat = byQS.filter(it => !catSel || catOf(it) === catSel);
   const fb = $('filters'); fb.innerHTML = '';
-  FILTERS.forEach(([k, t]) => { const b = document.createElement('button'); b.textContent = `${t} ${items.filter(x => matchF(x, k)).length}`; b.setAttribute('aria-pressed', listFilter === k); b.onclick = () => { listFilter = k; renderAll(); }; fb.append(b); });
-  const rows = items.filter(x => matchF(x, listFilter)).sort((a, b) => (a.shelf || '').localeCompare(b.shelf || '') || a.expiry.localeCompare(b.expiry));
-  $('list').innerHTML = rows.length ? '' : `<div class="empty">${items.length ? '這個分類沒有商品' : '還沒有資料，先去掃第一個商品吧'}</div>`;
-  rows.forEach(it => {
-    const el = document.createElement('div'); el.className = 'item';
-    el.innerHTML = `<div class="l"><div class="n">${esc(it.name)}</div><div class="sub mono">${esc(it.shelf || '—')}・${esc(it.expiry)}</div></div><div>${pill(daysLeft(it.expiry))}</div>`;
-    el.onclick = () => { tab('scan'); showResult(it.code); }; el.style.cursor = 'pointer';
-    $('list').append(el);
+  FILTERS.forEach(([k, t]) => {
+    const b = document.createElement('button'); b.textContent = `${t} ${byCat.filter(x => matchF(x, k)).length}`;
+    b.setAttribute('aria-pressed', listFilter === k); b.onclick = () => { listFilter = k; save('f', k); renderAll(); }; fb.append(b);
   });
+
+  // 分類標籤
+  const byStatus = byQS.filter(it => matchF(it, listFilter));
+  const catCount = {}; byStatus.forEach(it => catCount[catOf(it)] = (catCount[catOf(it)] || 0) + 1);
+  const allCats = [...cats, ...(items.some(x => !x.category) ? [NOCAT] : [])];
+  if (catSel && !allCats.includes(catSel)) catSel = '';
+  const cb = $('catChips'); cb.innerHTML = ''; cb.hidden = !allCats.length;
+  [['', '全部分類', byStatus.length], ...allCats.map(c => [c, c, catCount[c] || 0])].forEach(([v, t, n]) => {
+    const b = document.createElement('button'); b.innerHTML = `${esc(t)}<small>${n}</small>`;
+    b.setAttribute('aria-pressed', catSel === v); b.onclick = () => { catSel = catSel === v ? '' : v; save('cat', catSel); renderAll(); }; cb.append(b);
+  });
+
+  // 結果
+  const rows = byStatus.filter(it => !catSel || catOf(it) === catSel);
+  const cmpExp = (a, b) => (a.expiry || '9').localeCompare(b.expiry || '9');
+  const sorters = {
+    exp: cmpExp, expd: (a, b) => cmpExp(b, a),
+    shelf: (a, b) => (a.shelf || '~').localeCompare(b.shelf || '~', 'zh-Hant', { numeric: true }) || cmpExp(a, b),
+    name: (a, b) => a.name.localeCompare(b.name, 'zh-Hant') || cmpExp(a, b),
+  };
+  rows.sort(sorters[sortBy] || cmpExp);
+
+  const anyCond = ts.length || catSel || shelfSel || listFilter !== 'all';
+  $('count').textContent = `找到 ${rows.length} 筆` + (rows.length ? `，共 ${new Set(rows.map(x => x.code)).size} 種商品` : '');
+  $('resetF').hidden = !anyCond;
+
+  const list = $('list'); list.innerHTML = '';
+  if (!rows.length) {
+    list.innerHTML = `<div class="empty">${!items.length ? '還沒有資料，先去掃第一個商品吧' : ts.length ? `找不到「${esc($('q').value.trim())}」，試試看較短的關鍵字或條碼末幾碼` : '這個條件下沒有商品'}</div>`;
+  } else if (groupBy === 'none') {
+    rows.forEach(it => list.append(itemEl(it, ts, true)));
+  } else {
+    const key = groupBy === 'cat' ? catOf : it => it.shelf || NOSHELF;
+    const groups = new Map(); rows.forEach(it => { const k = key(it); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); });
+    const names = [...groups.keys()].sort((a, b) => (a === NOCAT || a === NOSHELF) - (b === NOCAT || b === NOSHELF) || a.localeCompare(b, 'zh-Hant', { numeric: true }));
+    names.forEach(g => {
+      const arr = groups.get(g), urgent = arr.filter(x => { const d = daysLeft(x.expiry); return d !== null && d <= 7; }).length;
+      const id = groupBy + ':' + g, isClosed = closed.has(id) && !ts.length;
+      const h = document.createElement('div'); h.className = 'grp' + (isClosed ? ' closed' : '');
+      h.innerHTML = `<span><span class="arr">▾</span>${esc(g)}</span><small>${arr.length} 筆${urgent ? `・<span style="color:var(--bad)">${urgent} 筆 7 天內</span>` : ''}</small>`;
+      h.onclick = () => { closed.has(id) ? closed.delete(id) : closed.add(id); renderAll(); };
+      list.append(h);
+      if (!isClosed) arr.forEach(it => list.append(itemEl(it, ts, groupBy !== 'cat')));
+    });
+  }
   if (current && !$('result').hidden) renderBatches();
 }
+function itemEl(it, ts, showCat) {
+  const el = document.createElement('div'); el.className = 'item'; el.style.cursor = 'pointer';
+  const ok = it.checkedMonth === curMonth();
+  el.innerHTML = `<div class="l"><div class="n">${hl(it.name, ts)}${showCat && it.category ? `<span class="tag">${hl(it.category, ts)}</span>` : ''}</div>
+    <div class="sub mono">${hl(it.shelf || '—', ts)}・${esc(it.expiry)}・${hlCode(it.code, ts)}</div>
+    ${ok ? '' : '<div class="sub" style="color:var(--warn)">本月未確認</div>'}</div><div>${pill(daysLeft(it.expiry))}</div>`;
+  el.onclick = () => { tab('scan'); showResult(it.code); };
+  return el;
+}
+function renderCatQuick(cats) {
+  const box = $('catQuick'); box.innerHTML = '';
+  cats.slice(0, 12).forEach(c => box.append(btn(c, '', () => { $('fCat').value = c; })));
+}
+let qTimer;
+$('q').addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(renderAll, 120); });
+$('qClear').onclick = () => { $('q').value = ''; renderAll(); $('q').focus(); };
+$('shelfSel').onchange = e => { shelfSel = e.target.value; save('shelf', shelfSel); renderAll(); };
+$('sortSel').onchange = e => { sortBy = e.target.value; save('sort', sortBy); renderAll(); };
+$('groupSel').onchange = e => { groupBy = e.target.value; save('group', groupBy); renderAll(); };
+$('resetF').onclick = () => { $('q').value = ''; catSel = ''; shelfSel = ''; listFilter = 'all'; ['cat', 'shelf'].forEach(k => save(k, '')); save('f', 'all'); renderAll(); };
 $('reloadBtn').onclick = () => api('list').then(() => toast('已更新')).catch(e => toast('讀取失敗：' + e.message));
-document.addEventListener('visibilitychange', () => { if (document.hidden) { if (loopOn) stopCam(); } else if (API && KEY) api('list').catch(() => {}); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { if (loopOn) stopCam(); } else if (API) api('list').catch(() => {}); });
 
 boot();
 </script>
