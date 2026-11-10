@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d6b58">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>貨架效期盤點</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root{
+  --bg:#f3f5f4;--surface:#fff;--line:#d9dfdc;--fg:#17201d;--muted:#5d6b66;
+  --accent:#1d6b58;--accent-ink:#fff;--accent-soft:#e1efe9;
+  --bad:#b42318;--bad-soft:#fde8e6;--warn:#a35a00;--warn-soft:#fff1dc;
+  --f-body:"Noto Sans TC",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#111715;--surface:#19211e;--line:#2c3833;--fg:#e7eeeb;--muted:#94a39d;
+  --accent:#4cb596;--accent-ink:#08130f;--accent-soft:#1d3029;
+  --bad:#ff8a7e;--bad-soft:#3a1d1a;--warn:#f2b45c;--warn-soft:#352812;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding:env(safe-area-inset-top,0) max(12px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-top:12px}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+h1{font-size:19px;margin:0}
+.prog{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:3px;width:140px}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
+.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:500;padding:9px;border-radius:7px}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px}
+/* 相機 */
+.cam{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:4/3;max-width:100%}
+.cam video{width:100%;height:100%;object-fit:cover;display:block}
+.cam .frame{position:absolute;left:8%;right:8%;top:30%;bottom:30%;border:2px solid rgba(255,255,255,.85);border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+.cam .laser{position:absolute;left:10%;right:10%;top:50%;height:2px;background:#ff4d4d;box-shadow:0 0 8px #ff4d4d;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.cam .ctrl{position:absolute;right:8px;top:8px;display:flex;gap:6px}
+.cam .ctrl button{background:rgba(0,0,0,.55);color:#fff;border:0;border-radius:999px;padding:6px 12px;font:inherit;font-size:13px}
+.cam .over{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;text-align:center;padding:16px;background:rgba(0,0,0,.6)}
+.cam.hit .frame{border-color:#4cff9a}
+.camhint{font-size:13px;color:var(--muted);margin:0;text-align:center}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+input{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;min-width:0}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:9px 14px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.big{width:100%;padding:13px;font-size:16px}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.5}
+.quick{display:flex;flex-wrap:wrap;gap:6px}
+.quick .btn{padding:6px 10px;font-size:13px}
+.codehead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.codehead .mono{font-size:18px}
+.batches{display:flex;flex-direction:column;gap:8px}
+.batch{border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.batch .top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap}
+.pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.ok{background:var(--accent-soft);color:var(--accent)}
+.sub{font-size:13px;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;z-index:20;max-width:90vw;text-align:center}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:5px 12px}
+.filters button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);align-items:center}
+.item:last-child{border-bottom:0}
+.item .l{min-width:0}
+.item .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.empty{color:var(--muted);text-align:center;padding:20px}
+ol{margin:0;padding-left:20px;font-size:14px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>貨架效期盤點</h1>
+    <div class="prog"><span id="progTxt">本月已確認 –</span><div class="bar"><i id="progBar"></i></div></div>
+  </header>
+
+  <!-- 設定 -->
+  <section class="card" id="setup" hidden>
+    <b>第一次使用：連接 Google 試算表</b>
+    <label>試算表網頁應用程式網址<input id="sUrl" class="mono" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <label>密碼（與 Code.gs 裡的 SECRET 相同）<input id="sKey" type="password"></label>
+    <button class="btn primary" id="sSave">連線</button>
+    <p class="sub" id="sMsg"></p>
+  </section>
+
+  <div id="app" hidden>
+    <div class="tabs" role="tablist">
+      <button id="tScan" aria-selected="true">掃描</button>
+      <button id="tList" aria-selected="false">清單</button>
+      <button id="tSet" aria-selected="false">設定</button>
+    </div>
+
+    <!-- 掃描 -->
+    <section id="pScan" style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+      <div class="cam" id="cam">
+        <video id="video" playsinline muted></video>
+        <div class="frame"></div><div class="laser"></div>
+        <div class="ctrl"><button id="torchBtn" hidden>手電筒</button></div>
+        <div class="over" id="camOver"><div id="camOverTxt">點下方按鈕開啟相機</div><button class="btn primary" id="startBtn">開始掃描</button></div>
+      </div>
+      <p class="camhint" id="camHint">條碼橫放在框內，距離約 10–15 公分</p>
+      <div class="row">
+        <input id="manual" class="mono" inputmode="numeric" placeholder="或手動輸入條碼數字" style="flex:1">
+        <button class="btn" id="manualBtn">查詢</button>
+      </div>
+
+      <!-- 掃到後 -->
+      <section class="card" id="result" hidden>
+        <div class="codehead"><span class="mono" id="rCode"></span><button class="btn sm" id="againBtn">繼續掃描</button></div>
+        <div class="batches" id="batches"></div>
+        <form id="form" style="display:flex;flex-direction:column;gap:10px" autocomplete="off">
+          <b id="formTitle">新增效期</b>
+          <div class="grid2">
+            <label>品名<input id="fName" required placeholder="例：鮮奶 936ml"></label>
+            <label>貨架<input id="fShelf" list="shelves" placeholder="例：A3-2"></label>
+          </div>
+          <datalist id="shelves"></datalist>
+          <label>有效期限<input id="fExp" type="date" required></label>
+          <div class="quick" id="quick"></div>
+          <button class="btn primary big" id="saveBtn" type="submit">儲存</button>
+        </form>
+      </section>
+    </section>
+
+    <!-- 清單 -->
+    <section id="pList" hidden style="margin-top:12px">
+      <div class="card">
+        <div class="filters" id="filters"></div>
+        <div id="list"></div>
+        <button class="btn" id="reloadBtn">重新整理</button>
+      </div>
+    </section>
+
+    <!-- 設定 -->
+    <section id="pSet" hidden style="margin-top:12px">
+      <div class="card">
+        <div class="sub">已連線：<span class="mono" id="curUrl" style="word-break:break-all"></span></div>
+        <button class="btn danger" id="resetBtn">中斷連線、重新設定</button>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script>
+/* 可以直接把網址和密碼寫在這裡，同事打開就不用再設定 */
+const PRESET_URL = '';
+const PRESET_KEY = '';
+
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, '0');
+const today = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const curMonth = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+const daysLeft = s => { if (!s) return null; const [y, m, d] = s.split('-').map(Number); return Math.round((new Date(y, m - 1, d) - today()) / 864e5); };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 2500); }
+function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
+
+let API = PRESET_URL || ls('api') || '', KEY = PRESET_KEY || ls('key') || '';
+let items = [], current = null, editingId = null, listFilter = 'stale';
+
+/* ---------- 後端 ---------- */
+async function api(action, data = {}) {
+  let res;
+  if (action === 'list') res = await fetch(`${API}?action=list&key=${encodeURIComponent(KEY)}`);
+  else res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, key: KEY, ...data }) });
+  const j = await res.json();
+  if (!j.ok) throw new Error(j.error || '伺服器錯誤');
+  items = j.items || []; renderAll();
+  return j;
+}
+
+/* ---------- 啟動 ---------- */
+function boot() {
+  if (!API || !KEY) { $('setup').hidden = false; $('app').hidden = true; return; }
+  $('setup').hidden = true; $('app').hidden = false; $('curUrl').textContent = API;
+  api('list').catch(e => toast('讀取失敗：' + e.message));
+}
+$('sSave').onclick = async () => {
+  API = $('sUrl').value.trim(); KEY = $('sKey').value;
+  if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(API)) { $('sMsg').textContent = '網址應該是 https://script.google.com/macros/s/…/exec'; return; }
+  $('sMsg').textContent = '連線中…';
+  try { await api('list'); ls('api', API); ls('key', KEY); $('sMsg').textContent = ''; boot(); toast('連線成功'); }
+  catch (e) { $('sMsg').textContent = '連線失敗：' + e.message + '。請確認網址、密碼，以及部署時存取權選「所有人」。'; }
+};
+$('resetBtn').onclick = () => { ls('api', null); ls('key', null); API = ''; KEY = ''; stopCam(); boot(); };
+
+/* ---------- 分頁 ---------- */
+function tab(t) {
+  [['scan', 'tScan', 'pScan'], ['list', 'tList', 'pList'], ['set', 'tSet', 'pSet']].forEach(([k, b, p]) => {
+    $(b).setAttribute('aria-selected', k === t); $(p).hidden = k !== t; if (k === 'scan') $(p).style.display = k === t ? 'flex' : 'none';
+  });
+  if (t !== 'scan') stopCam();
+}
+$('tScan').onclick = () => tab('scan'); $('tList').onclick = () => tab('list'); $('tSet').onclick = () => tab('set');
+
+/* ---------- 條碼工具 ---------- */
+function checkEAN(s) {
+  if (!/^(\d{8}|\d{12}|\d{13})$/.test(s)) return true;
+  const d = s.split('').map(Number), last = d.pop(); let sum = 0;
+  d.reverse().forEach((n, i) => sum += n * (i % 2 === 0 ? 3 : 1));
+  return (10 - sum % 10) % 10 === last;
+}
+function cleanCode(t) { t = String(t).trim(); if (/^\d{12}$/.test(t) && checkEAN(t)) return '0' + t; return t; } // UPC-A → 13 碼
+
+/* ---------- 即時相機 ---------- */
+let stream = null, track = null, loopOn = false, detector = null, zReader = null, zHints = null, lastCode = '', hits = 0, torchOn = false;
+const work = document.createElement('canvas'), wctx = work.getContext('2d', { willReadFrequently: true });
+
+async function setupDecoders() {
+  if ('BarcodeDetector' in window && !detector) {
+    try {
+      const fm = await BarcodeDetector.getSupportedFormats();
+      const want = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf'].filter(f => fm.includes(f));
+      if (want.includes('ean_13')) detector = new BarcodeDetector({ formats: want });
+    } catch (e) {}
+  }
+  if (!zReader && window.ZXing) {
+    const F = ZXing.BarcodeFormat; zHints = new Map();
+    zHints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF]);
+    zHints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    zReader = new ZXing.MultiFormatReader(); zReader.setHints(zHints);
+  }
+}
+async function startCam() {
+  if (!navigator.mediaDevices?.getUserMedia) { $('camOverTxt').textContent = '這個瀏覽器不支援相機，請用 Safari 或 Chrome 開啟，並確認網址是 https。'; return; }
+  $('camOverTxt').textContent = '開啟相機中…';
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+  } catch (e) {
+    $('camOverTxt').textContent = e.name === 'NotAllowedError' ? '相機權限被拒絕。請到瀏覽器設定允許此網站使用相機，再重新整理。' : '無法開啟相機：' + e.message; return;
+  }
+  track = stream.getVideoTracks()[0];
+  try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  $('torchBtn').hidden = !caps.torch;
+  const v = $('video'); v.srcObject = stream; await v.play();
+  await setupDecoders();
+  $('camOver').hidden = true; $('cam').classList.remove('hit');
+  lastCode = ''; hits = 0; loopOn = true; scanLoop();
+}
+function stopCam() {
+  loopOn = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; track = null; torchOn = false;
+  $('camOver').hidden = false; $('camOverTxt').textContent = '點下方按鈕開啟相機'; $('startBtn').textContent = '開始掃描';
+}
+$('startBtn').onclick = () => resume();
+$('torchBtn').onclick = async () => { if (!track) return; torchOn = !torchOn; try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); } catch (e) { toast('無法開啟手電筒'); } };
+
+function grabCrop(v, rot) {
+  // 只取掃描框附近（中間偏寬的一條），速度快也比較準
+  const vw = v.videoWidth, vh = v.videoHeight; if (!vw) return null;
+  const cw = vw * 0.9, ch = vh * 0.5, sx = (vw - cw) / 2, sy = (vh - ch) / 2;
+  const k = Math.min(1, 1280 / cw);
+  if (rot) { work.width = Math.round(ch * k); work.height = Math.round(cw * k); wctx.save(); wctx.translate(work.width / 2, work.height / 2); wctx.rotate(Math.PI / 2); wctx.drawImage(v, sx, sy, cw, ch, -work.height / 2, -work.width / 2, work.height, work.width); wctx.restore(); }
+  else { work.width = Math.round(cw * k); work.height = Math.round(ch * k); wctx.drawImage(v, sx, sy, cw, ch, 0, 0, work.width, work.height); }
+  return work;
+}
+let frame = 0;
+async function scanLoop() {
+  if (!loopOn) return;
+  const v = $('video'); let code = null;
+  try {
+    if (detector) {
+      const r = await detector.detect(v); if (r[0]) code = r[0].rawValue;
+    } else if (zReader) {
+      const c = grabCrop(v, (frame++ % 4) === 3); // 偶爾試直向條碼
+      if (c) { try { const res = zReader.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(c))), zHints); if (res) code = res.getText(); } catch (e) {} }
+    }
+  } catch (e) {}
+  if (code) {
+    code = cleanCode(code);
+    if (checkEAN(code)) {
+      hits = code === lastCode ? hits + 1 : 1; lastCode = code;
+      if (hits >= 2) { onScanned(code); return; } // 連續兩次讀到相同號碼才算數
+    }
+  }
+  setTimeout(() => requestAnimationFrame(scanLoop), detector ? 60 : 90);
+}
+let actx = null;
+function beep() {
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 1800; g.gain.value = .15; o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + .12); } catch (e) {}
+  try { navigator.vibrate && navigator.vibrate(80); } catch (e) {}
+}
+function onScanned(code) {
+  loopOn = false; beep(); $('cam').classList.add('hit');
+  $('camOver').hidden = false; $('camOverTxt').textContent = '已讀到 ' + code; $('startBtn').textContent = '掃下一個';
+  showResult(code);
+}
+function resume() { $('result').hidden = true; if (stream) { $('camOver').hidden = true; $('cam').classList.remove('hit'); lastCode = ''; hits = 0; loopOn = true; scanLoop(); } else startCam(); }
+$('againBtn').onclick = () => { resume(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+$('manualBtn').onclick = () => { const c = cleanCode($('manual').value); if (!c) return; if (!checkEAN(c)) { toast('條碼檢查碼不對，請再確認數字'); return; } loopOn = false; showResult(c); $('manual').value = ''; };
+$('manual').addEventListener('keydown', e => { if (e.key === 'Enter') $('manualBtn').click(); });
+
+/* ---------- 結果 / 批次 ---------- */
+function pill(d) {
+  if (d === null) return '';
+  if (d < 0) return `<span class="pill bad">已過期 ${-d} 天</span>`;
+  if (d <= 7) return `<span class="pill bad">剩 ${d} 天</span>`;
+  if (d <= 30) return `<span class="pill warn">剩 ${d} 天</span>`;
+  return `<span class="pill ok">剩 ${d} 天</span>`;
+}
+function showResult(code) {
+  current = code; editingId = null;
+  $('result').hidden = false; $('rCode').textContent = code;
+  const mine = items.filter(x => x.code === code);
+  $('fName').value = mine[0]?.name || ''; $('fShelf').value = mine[0]?.shelf || ''; $('fExp').value = '';
+  $('formTitle').textContent = mine.length ? '新增另一個效期（不同批號）' : '新商品，請填入資料';
+  renderBatches();
+  setTimeout(() => $('result').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  if (!$('fName').value) $('fName').focus(); else $('fExp').focus();
+}
+function renderBatches() {
+  const box = $('batches'); box.innerHTML = ''; if (!current) return;
+  const mine = items.filter(x => x.code === current).sort((a, b) => a.expiry.localeCompare(b.expiry));
+  if (!mine.length) return;
+  const cm = curMonth();
+  const h = document.createElement('div'); h.className = 'sub'; h.textContent = `${mine[0].name}：貨架上目前登錄 ${mine.length} 個效期`; box.appendChild(h);
+  mine.forEach(it => {
+    const ok = it.checkedMonth === cm, d = daysLeft(it.expiry);
+    const el = document.createElement('div'); el.className = 'batch';
+    el.innerHTML = `<div class="top"><span class="mono">${esc(it.expiry)}</span>${pill(d)}</div>
+      <div class="sub">${esc(it.shelf || '未填貨架')}・${ok ? '本月已確認' : '本月未確認（上次 ' + esc(it.checkedMonth || '—') + '）'}</div><div class="row"></div>`;
+    const row = el.querySelector('.row');
+    if (!ok) row.append(btn('效期沒變，確認', 'btn sm primary', () => act('confirm', { id: it.id }, '已確認')));
+    row.append(btn('修改', 'btn sm', () => { editingId = it.id; $('fName').value = it.name; $('fShelf').value = it.shelf; $('fExp').value = it.expiry; $('formTitle').textContent = '修改這個效期'; $('fExp').focus(); }));
+    const del = btn('已下架/賣完', 'btn sm', () => {
+      row.innerHTML = '<span class="sub">確定刪除這個效期？</span>';
+      row.append(btn('刪除', 'btn sm danger', () => act('delete', { id: it.id }, '已刪除')), btn('取消', 'btn sm', renderBatches));
+    });
+    row.append(del); box.appendChild(el);
+  });
+}
+function btn(t, c, fn) { const b = document.createElement('button'); b.type = 'button'; b.className = c; b.textContent = t; b.onclick = fn; return b; }
+async function act(action, data, msg) {
+  try { await api(action, data); toast(msg); } catch (e) { toast('失敗：' + e.message); }
+}
+[['+7天', 7], ['+1個月', 30], ['+3個月', 91], ['+6個月', 182], ['+1年', 365]].forEach(([t, n]) => {
+  $('quick').append(btn(t, 'btn', () => { const d = today(); d.setDate(d.getDate() + n); $('fExp').value = ymd(d); }));
+});
+$('form').onsubmit = async e => {
+  e.preventDefault(); if (!current) return;
+  $('saveBtn').disabled = true; $('saveBtn').textContent = '儲存中…';
+  try {
+    await api('save', { id: editingId, code: current, name: $('fName').value.trim(), shelf: $('fShelf').value.trim(), expiry: $('fExp').value });
+    toast('已儲存，可以掃下一個'); editingId = null; $('fExp').value = ''; $('formTitle').textContent = '新增另一個效期（不同批號）';
+  } catch (err) { toast('儲存失敗：' + err.message); }
+  $('saveBtn').disabled = false; $('saveBtn').textContent = '儲存';
+};
+
+/* ---------- 清單 ---------- */
+const FILTERS = [['stale', '本月未確認'], ['d30', '30天內'], ['expired', '已過期'], ['all', '全部']];
+function matchF(it, f) { const d = daysLeft(it.expiry); if (f === 'stale') return it.checkedMonth !== curMonth(); if (f === 'expired') return d !== null && d < 0; if (f === 'd30') return d !== null && d >= 0 && d <= 30; return true; }
+function renderAll() {
+  const cm = curMonth(), done = items.filter(x => x.checkedMonth === cm).length;
+  $('progTxt').textContent = `本月已確認 ${done} / ${items.length}`; $('progBar').style.width = items.length ? done / items.length * 100 + '%' : '0';
+  $('shelves').innerHTML = [...new Set(items.map(x => x.shelf).filter(Boolean))].sort().map(s => `<option value="${esc(s)}">`).join('');
+  const fb = $('filters'); fb.innerHTML = '';
+  FILTERS.forEach(([k, t]) => { const b = document.createElement('button'); b.textContent = `${t} ${items.filter(x => matchF(x, k)).length}`; b.setAttribute('aria-pressed', listFilter === k); b.onclick = () => { listFilter = k; renderAll(); }; fb.append(b); });
+  const rows = items.filter(x => matchF(x, listFilter)).sort((a, b) => (a.shelf || '').localeCompare(b.shelf || '') || a.expiry.localeCompare(b.expiry));
+  $('list').innerHTML = rows.length ? '' : `<div class="empty">${items.length ? '這個分類沒有商品' : '還沒有資料，先去掃第一個商品吧'}</div>`;
+  rows.forEach(it => {
+    const el = document.createElement('div'); el.className = 'item';
+    el.innerHTML = `<div class="l"><div class="n">${esc(it.name)}</div><div class="sub mono">${esc(it.shelf || '—')}・${esc(it.expiry)}</div></div><div>${pill(daysLeft(it.expiry))}</div>`;
+    el.onclick = () => { tab('scan'); showResult(it.code); }; el.style.cursor = 'pointer';
+    $('list').append(el);
+  });
+  if (current && !$('result').hidden) renderBatches();
+}
+$('reloadBtn').onclick = () => api('list').then(() => toast('已更新')).catch(e => toast('讀取失敗：' + e.message));
+document.addEventListener('visibilitychange', () => { if (document.hidden) { if (loopOn) stopCam(); } else if (API && KEY) api('list').catch(() => {}); });
+
+boot();
+</script>
+</body>
+</html>
